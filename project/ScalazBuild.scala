@@ -55,7 +55,7 @@ object ScalazBuild extends Build {
       libraryDependencies <++= (dependencyScalaVersion)(dsv => Seq(Dependency.ScalaCheck(dsv)))
     )
   )
-  
+
   lazy val sql = Project(
     id = "scalaz-sql",
     base = file("sql"),
@@ -154,7 +154,7 @@ object ScalazBuild extends Build {
 
     def ScalaCheck(scalaVersion: String) = "org.scala-tools.testing" % "scalacheck_%s".format(scalaVersion) % "1.9"
 
-    def Specs(scalaVersion: String) = "org.scala-tools.testing" % "specs_%s".format(scalaVersion) % "1.6.8" % "test"
+    def Specs(scalaVersion: String) = "org.scala-tools.testing" % "specs_%s".format("2.9.0-1") % "1.6.8" % "test"
   }
 
   val dependencyScalaVersionTranslator = SettingKey[(String => String)]("dependency-scala-version-translator", "Function to translate the current scala version to the version used for dependency resolution")
@@ -163,7 +163,7 @@ object ScalazBuild extends Build {
   lazy val standardSettings = Defaults.defaultSettings ++ Seq(
     organization := "org.scalaz",
     version := "7.0-SNAPSHOT",
-    scalaVersion := "2.9.0-1",
+    scalaVersion := "2.9.1",
     crossScalaVersions := Seq("2.9.0-1", "2.9.1.RC1"),
     resolvers += ScalaToolsSnapshots,
 
