@@ -164,7 +164,7 @@ object ScalazBuild extends Build {
     organization := "org.scalaz",
     version := "7.0-SNAPSHOT",
     scalaVersion := "2.9.1",
-    crossScalaVersions := Seq("2.9.0-1", "2.9.1.RC1"),
+    crossScalaVersions := Seq("2.9.1", "2.9.0-1", "2.9.1.RC1"),
     resolvers += ScalaToolsSnapshots,
 
     dependencyScalaVersionTranslator := (Dependency.dependencyScalaVersion _),
