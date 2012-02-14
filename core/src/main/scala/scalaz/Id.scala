@@ -8,7 +8,7 @@ trait IdInstances {
     def cojoin[A](a: Id[A]): A = a
     def copoint[A](p: Id[A]): A = p
     def traverseImpl[G[_]: Applicative, A, B](fa: Id[A])(f: (A) => G[B]): G[Id[B]] = f(fa)
-    def foldRight[A, B](fa: scalaz.Id[A], z: => B)(f: (A, => B) => B): B = f(fa, z)
+    override def foldRight[A, B](fa: scalaz.Id[A], z: => B)(f: (A, => B) => B): B = f(fa, z)
 
     // Overrides for efficiency.
 
@@ -50,7 +50,7 @@ trait IdInstances {
 
     override def lift5[A, B, C, D, E, R](f: (A, B, C, D, E) => R): (Id[A], Id[B], Id[C], Id[D], Id[E]) => Id[R] = f*/
 
-    override def compose[G[_]](G0: Applicative[G]): Applicative[G] = G0
+    override def compose[G[_]](implicit G0: Applicative[G]): Applicative[G] = G0
 
     // TODO Fun compiler bug? "can't existentially abstract over parameterized type G"
     // override def product1[G[_]](implicit G0: Applicative[G]): Applicative[G] = G0

@@ -3,14 +3,21 @@ package iteratee
 
 import std.AllInstances._
 import Iteratee._
+import Enumeratee2T._
 import effect._
 
 class IterateeTTest extends Spec {
-
   "head" in {
-    (head[Unit, Int, Id].>>==(enumStream(Stream(1, 2, 3)))).runOrZero must be_===(Some(1))
+    (head[Unit, Int, Id] &= enumStream(Stream(1, 2, 3))).runOrZero must be_===(Some(1))
+  }
 
-    (head[Unit, Int, Id] >>== Stream(1, 2, 3)).runOrZero must be_===(Some(1))
+  "consume" in {
+    (consume[Unit, Int, Id, List] &= enumStream(Stream(1, 2, 3))).runOrZero must be_===(List(1, 2, 3))
+  }
+
+  "fold in constant stack space" in {
+    skipped("TODO")
+    (fold[Unit, Int, Id, Int](0){ case (a,v) => a + v } &= enumStream[Unit, Int, Id](Stream.fill(10000)(1))).runOrZero must be_===(10000)
   }
 
   object instances {
@@ -22,17 +29,6 @@ class IterateeTTest extends Spec {
 
     object iteratee {
       def monad[X, E, F] = Monad[({type λ[α] = Iteratee[X, E, α]})#λ]
-    }
-
-    object enumeratorT {
-      def semigroup[X, E, F[_]: Bind, A] = Semigroup[EnumeratorT[X, E, F, A]]
-      def monoid[X, E, F[_]: Monad, A] = Monoid[EnumeratorT[X, E, F, A]]
-      def plus[X, E, F[_]: Bind, A] = Plus[({type λ[α]=EnumeratorT[X, E, F, α]})#λ]
-      def empty[X, E, F[_]: Monad, A] = PlusEmpty[({type λ[α]=EnumeratorT[X, E, F, α]})#λ]
-    }
-
-    object enumerator {
-      def monoid[X, E, A] = Monoid[Enumerator[X, E, A]]
     }
   }
 }

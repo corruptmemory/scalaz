@@ -31,8 +31,6 @@ object TypeClass {
   lazy val pointed = TypeClass("Pointed", *->*, extendsList = Seq(functor))
   lazy val apply: TypeClass = TypeClass("Apply", *->*, extendsList = Seq(functor))
   lazy val applicative = TypeClass("Applicative", *->*, extendsList = Seq(apply, pointed))
-  lazy val alternative = TypeClass("Alternative", *->*, extendsList = Seq(applicative))
-  lazy val alternativeEmpty = TypeClass("AlternativeEmpty", *->*, extendsList = Seq(alternative))
   lazy val bind = TypeClass("Bind", *->*, extendsList = Seq(apply))
   lazy val monad = TypeClass("Monad", *->*, extendsList = Seq(applicative, bind))
   lazy val foldable = TypeClass("Foldable", *->*)
@@ -57,8 +55,6 @@ object TypeClass {
   lazy val category = TypeClass("Category", *^*->*, extendsList = Seq(arrId, compose))
   lazy val first = TypeClass("First", *^*->*)
   lazy val arrow = TypeClass("Arrow", *^*->*, extendsList = Seq(category))
-
-  lazy val run = TypeClass("Run", *, pack = Seq("scalaz", "concurrent"))
 
   lazy val liftIO = TypeClass("LiftIO", *->*, pack = Seq("scalaz", "effect"))
   lazy val monadIO = TypeClass("MonadIO", *->*, extendsList = Seq(liftIO, monad), pack = Seq("scalaz", "effect"))
@@ -86,8 +82,6 @@ object TypeClass {
     coPointed,
     apply,
     applicative,
-    alternative,
-    alternativeEmpty,
     bind,
     monad,
     coJoin,
@@ -105,7 +99,7 @@ object TypeClass {
     category,
     arrow
   )
-  lazy val concurrent = Seq(run)
+  lazy val concurrent = Seq[TypeClass]()
   def effect = Seq(liftIO, monadIO, liftControlIO, monadControlIO, resource)
 }
 
