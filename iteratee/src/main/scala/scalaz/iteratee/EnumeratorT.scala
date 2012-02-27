@@ -8,53 +8,65 @@ import Ordering._
 trait EnumeratorT[X, E, F[_]] { self =>
   def apply[A]: StepT[X, E, F, A] => IterateeT[X, E, F, A]
 
+  def mapE[I](et: EnumerateeT[X, E, I, F])(implicit M: Monad[F]): EnumeratorT[X, I, F] = et run self
+
   def map[B](f: E => B)(implicit ev: Monad[F]): EnumeratorT[X, B, F] = 
-    new EnumeratorT[X, B, F] {
-      def apply[A] = { (step: StepT[X, B, F, A]) => 
-        iterateeT((EnumerateeT.map[X, E, B, F](f).apply(step) &= self).run(x => err[X, B, F, A](x).value))
-      }
-    }
+    EnumerateeT.map[X, E, B, F](f) run self
 
-  def flatMap[B](f: E => EnumeratorT[X, B, F])(implicit M0: Monad[F]) = 
-    new EnumeratorT[X, B, F] {
-      def apply[A] = {
-        def loop(step: StepT[X, B, F, A]): IterateeT[X, E, F, StepT[X, B, F, A]] = {
-          step.fold(
-            cont = contf => cont[X, E, F, StepT[X, B, F, A]] {
-              (_: Input[E]).map(e => f(e)).fold(
-                el    = en => en.apply(step) >>== loop,
-                empty = contf(emptyInput) >>== loop,
-                eof   = done(step, emptyInput)
-              )
-            },
-            done = (a, _) => done(sdone(a, emptyInput), emptyInput),
-            err  = x => err(x)
-          )
-        }
-
-        (step: StepT[X, B, F, A]) => iterateeT((loop(step) &= self).run(x => err[X, B, F, A](x).value))
-      }
+  def #::(e: => E)(implicit F: Monad[F]): EnumeratorT[X, E, F] = {
+    new EnumeratorT[X, E, F] {
+      def apply[A] = _.mapCont(_(elInput(e))) &= self
     }
+  }
+
+  def flatMap[B](f: E => EnumeratorT[X, B, F])(implicit M1: Monad[F]) = 
+    EnumerateeT.flatMap(f) run self
+
+  def flatten[B, G[_]](implicit ev: E =:= G[B], MO: F |>=| G): EnumeratorT[X, B, F] = {
+    import MO._
+    flatMap(e => EnumeratorT.enumeratorTMonadTrans[X].liftM(MO.promote(ev(e))))
+  }
+
+  def bindM[B, G[_]](f: E => G[EnumeratorT[X, B, F]])(implicit F: Monad[F], G: Monad[G]): F[G[EnumeratorT[X, B, F]]] = {
+    import scalaz.syntax.semigroup._
+    val iter = fold[X, G[EnumeratorT[X, B, F]], F, G[EnumeratorT[X, B, F]]](G.point(EnumeratorT.empty[X, B, F])) {
+      case (acc, concat) => G.bind(acc) { en => 
+                              G.map(concat) { append => en |+| append } 
+                            }
+    }   
+
+    (iter &= self.map(f)).run(x => F.point(G.point(pointErr[X, B, F](x))))
+  }
 
   def collect[B](pf: PartialFunction[E, B])(implicit monad: Monad[F]): EnumeratorT[X, B, F] = 
-    new EnumeratorT[X, B, F] {
-      def apply[A] = { (step: StepT[X, B, F, A]) => 
-        iterateeT((EnumerateeT.collect[X, E, B, F](pf).apply(step) &= self).run(x => err[X, B, F, A](x).value))
-      }
-    }
+    EnumerateeT.collect[X, E, B, F](pf) run self
 
   def uniq(implicit ord: Order[E], M: Monad[F]): EnumeratorT[X, E, F] = 
-    new EnumeratorT[X, E, F] {
-      def apply[A] = s => EnumerateeT.uniq[X, E, F].apply(s).joinI[E, A] &= self
-    }
+    EnumerateeT.uniq[X, E, F] run self
 
   def zipWithIndex(implicit M: Monad[F]): EnumeratorT[X, (E, Long), F] = 
-    new EnumeratorT[X, (E, Long), F] {
-      def apply[A] = s => iterateeT((EnumerateeT.zipWithIndex[X, E, F].apply(s) &= self).run(x => err[X, (E, Long), F, A](x).value))
-    }
+    EnumerateeT.zipWithIndex[X, E, F] run self
 
   def drainTo[M[_]](implicit M: Monad[F], P: PlusEmpty[M], Z: Pointed[M]): F[M[E]] =
-    (IterateeT.consume[X, E, F, M] &= this).run(_ => M.point(P.empty)) 
+    (IterateeT.consume[X, E, F, M] &= self).run(_ => M.point(P.empty)) 
+
+  def reduced[B](b: B)(f: (B, E) => B)(implicit M: Monad[F]): EnumeratorT[X, B, F] = 
+    new EnumeratorT[X, B, F] {
+      def apply[A] = (step: StepT[X, B, F, A]) => {
+        def check(s: StepT[X, E, F, B]): IterateeT[X, B, F, A] = s.fold(
+          cont = k => k(eofInput) >>== {
+            s => s.mapContOr(_ => sys.error("diverging iteratee"), check(s))
+          }
+          , done = (a, _) => step.mapCont(f => f(elInput(a)))
+          , err  = x => err(x)
+        )
+
+        iterateeT(M.bind((IterateeT.fold[X, E, F, B](b)(f) &= self).value) { s => check(s).value })
+      }
+    }
+    
+  def cross[E2](e2: EnumeratorT[X, E2, F])(implicit M: Monad[F]): EnumeratorT[X, (E, E2), F] =
+    EnumerateeT.cross[X, E, E2, F](e2) run self
 }
 
 trait EnumeratorTInstances0 {
@@ -89,12 +101,25 @@ trait EnumeratorTFunctions {
       def apply[A] = _.pointI
     }
 
+  def pointErr[X, E, F[_]: Pointed](x: X): EnumeratorT[X, E, F] = 
+    new EnumeratorT[X, E, F] { 
+      def apply[A] = _ => err[X, E, F, A](x)
+    }
+
   /** 
    * An EnumeratorT that is at EOF
    */
   def enumEofT[X, E, F[_] : Pointed]: EnumeratorT[X, E, F] =
     new EnumeratorT[X, E, F] { 
       def apply[A] = _.mapCont(_(eofInput))
+    }
+
+  /**
+   * An enumerator that forces the evaulation of an effect in the F monad when it is consumed.
+   */
+  def perform[X, E, F[_]: Monad, B](f: F[B]): EnumeratorT[X, E, F] = 
+    new EnumeratorT[X, E, F] { 
+      def apply[A] = s => iterateeT(Monad[F].bind(f) { _ => s.pointI.value })
     }
 
   def enumOne[X, E, F[_]: Pointed](e: E): EnumeratorT[X, E, F] = 
@@ -177,29 +202,6 @@ trait EnumeratorTFunctions {
         }
 
         checkCont1(contFactory => state => k => k(elInput(e)) >>== contFactory(f(state)), e)
-      }
-    }
-    
-  def cross[X, E1, E2, F[_]: Monad](e1: EnumeratorT[X, E1, F], e2: EnumeratorT[X, E2, F]): EnumeratorT[X, (E1, E2), F] =
-    new EnumeratorT[X, (E1, E2), F] {
-      def apply[A] = (step: StepT[X, (E1, E2), F, A]) => {
-        def outerLoop(step: StepT[X, (E1, E2), F, A]): IterateeT[X, E1, F, StepT[X, (E1, E2), F, A]] =
-          for {
-            outerOpt   <- head[X, E1, F]
-            sa         <- outerOpt match {
-                            case Some(e) => 
-                              val pairingIteratee = EnumerateeT.map[X, E2, (E1, E2), F]((a: E2) => (e, a)).apply(step)
-                              val nextStep = (pairingIteratee &= e2).run(x => err[X, (E1, E2), F, A](x).value)
-                              iterateeT[X, (E1, E2), F, A](nextStep) >>== outerLoop
-
-                            case None    => 
-                              done[X, E1, F, StepT[X, (E1, E2), F, A]](step, eofInput) 
-                          }
-          } yield sa
-
-        iterateeT[X, (E1, E2), F, A] {
-          (outerLoop(step) &= e1).run(x => err[X, (E1, E2), F, A](x).value)
-        }
       }
     }
 }

@@ -31,37 +31,36 @@ class EnumeratorTTest extends Spec {
 
   "map" in {
     val enum = enumStream[Unit, Int, Id](Stream(1, 2, 3))
-    type EnumId[α] = EnumeratorT[Unit, α, Id]
     (consume[Unit, Int, Id, List] &= enum.map(_ * 2)).runOrZero must be_===(List(2, 4, 6))
   }
   
   "flatMap" in {
     val enum = enumStream[Unit, Int, Id](Stream(1, 2, 3))
-    type EnumId[α] = EnumeratorT[Unit, α, Id]
     (consume[Unit, Int, Id, List] &= enum.flatMap(i => enum.map(_ + i))).runOrZero must be_===(List(2, 3, 4, 3, 4, 5, 4, 5, 6))
+  }
+
+  "flatten in a generalized fashion" in {
+    val enum = enumOne[Unit, List[Int], List](List(1, 2, 3))
+    (consume[Unit, Int, List, List] &= enum.flatten).runOrZero.flatten must be_===(List(1, 2, 3))
   }
 
   "uniq" in {
     val enum = enumStream[Unit, Int, Id](Stream(1, 1, 2, 2, 2, 3, 3))
-    type EnumId[α] = EnumeratorT[Unit, α, Id]
     (consume[Unit, Int, Id, List] &= enum.uniq).runOrZero must be_===(List(1, 2, 3))
   }
 
   "zipWithIndex" in {
     val enum = enumStream[Unit, Int, Id](Stream(3, 4, 5))
-    type EnumId[α] = EnumeratorT[Unit, α, Id]
     (consume[Unit, (Int, Long), Id, List] &= enum.zipWithIndex).runOrZero must be_===(List((3, 0L), (4, 1L), (5, 2L)))
   }
 
   "zipWithIndex" in {
     val enum = enumStream[Unit, Int, Id](Stream(3, 4, 5))
-    type EnumId[α] = EnumeratorT[Unit, α, Id]
     (consume[Unit, (Int, Long), Id, List] &= enum.zipWithIndex).runOrZero must be_===(List((3, 0L), (4, 1L), (5, 2L)))
   }
 
   "zipWithIndex in combination with another function" in {
     val enum = enumStream[Unit, Int, Id](Stream(3, 4, 4, 5))
-    type EnumId[α] = EnumeratorT[Unit, α, Id]
     (consume[Unit, (Int, Long), Id, List] &= enum.uniq.zipWithIndex).runOrZero must be_===(List((3, 0L), (4, 1L), (5, 2L)))
   }
 
@@ -84,6 +83,21 @@ class EnumeratorTTest extends Spec {
   "drain" in {
     val enum = enumStream[Unit, Int, Id](Stream(1, 2, 3))
     enum.drainTo[List] must be_===(List(1, 2, 3))
+  }
+
+  "perform an interleaved effect" in {
+    import scalaz.syntax.monoid._
+    var v: Int = 0
+    val enum = enumStream[Unit, Int, IO](Stream(1, 2))
+    val effect = EnumeratorT.perform[Unit, Int, IO, Unit](IO(v = 1))
+    val enum2 = enumStream[Unit, Int, IO](Stream(3, 4))
+
+    val testIter = IterateeT.fold[Unit, Int, IO, Boolean](true) {
+      case (false, _) => false
+      case (true, i) => if (i <= 2) v == 0 else v == 1
+    }
+
+    (testIter &= (enum |+| effect |+| enum2)).run(_ => sys.error("unexpected")).unsafePerformIO must be_===(true)
   }
 
   //checkAll(functor.laws[Enum])
