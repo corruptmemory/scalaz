@@ -39,10 +39,10 @@ trait DList[A] {
     }).run
 
   /** Get the first element of the list. */
-  def head: A = uncons(sys.error("DList.head: empty list"), (x, y) => x)
+  def head: A = uncons(sys.error("DList.head: empty list"), (x, _) => x)
 
   /** Get the tail of the list. */
-  def tail: DList[A] = uncons(sys.error("DList.tail: empty list"), (x, y) => y) 
+  def tail: DList[A] = uncons(sys.error("DList.tail: empty list"), (_, y) => y)
 
   /** Fold over a difference list. */
   def foldr[B](z: => B)(f: (A, => B) => B): B = {

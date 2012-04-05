@@ -33,7 +33,7 @@ trait Syntaxes {
 
   object contravariant extends ToContravariantV
 
-  object coPointed extends ToCoPointedV
+  object copointed extends ToCopointedV
 
   object apply extends ToApplyV
 
@@ -43,9 +43,9 @@ trait Syntaxes {
 
   object monad extends ToMonadV
 
-  object coJoin extends ToCoJoinV
+  object cojoin extends ToCojoinV
 
-  object coMonad extends ToCoMonadV
+  object comonad extends ToComonadV
 
   object plus extends ToPlusV
 
@@ -79,18 +79,19 @@ trait Syntaxes {
 
   object validation extends ToValidationV
 
+  object kleisli extends ToKleisliV
 
   object all extends ToAllTypeClassV with ToAllOtherV
 
 }
 
-trait ToAllOtherV extends ToIdV with ToTreeV with ToWriterV with ToValidationV with ToReducerV
+trait ToAllOtherV extends ToIdV with ToTreeV with ToWriterV with ToValidationV with ToReducerV with ToKleisliV
 
 trait ToAllTypeClassV
   extends ToSemigroupV with ToMonoidV with ToGroupV with ToEqualV with ToLengthV with ToShowV
   with ToOrderV with ToEnumV with ToMetricSpaceV with ToPlusEmptyV with ToEachV with ToIndexV
-  with ToFunctorV with ToPointedV with ToContravariantV with ToCoPointedV with ToApplyV
-  with ToApplicativeV with ToBindV with ToMonadV with ToCoJoinV with ToCoMonadV
+  with ToFunctorV with ToPointedV with ToContravariantV with ToCopointedV with ToApplyV
+  with ToApplicativeV with ToBindV with ToMonadV with ToCojoinV with ToComonadV
   with ToPlusV with ToApplicativePlusV with ToMonadPlusV with ToTraverseV with ToBiFunctorV
   with ToBiTraverseV with ToArrIdV with ToComposeV with ToCategoryV
   with ToArrowV with ToFoldableV
