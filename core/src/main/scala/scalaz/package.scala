@@ -1,3 +1,4 @@
+
 /**
  * '''Scalaz''': Type classes and pure functional data structures for Scala.
  *
@@ -45,8 +46,8 @@
  *  - [[scalaz.Foldable]]
  *  - [[scalaz.Traverse]] extends [[scalaz.Functor]] with [[scalaz.Foldable]]
  *
- *  - [[scalaz.BiFunctor]]
- *  - [[scalaz.BiTraverse]] extends [[scalaz.BiFunctor]]
+ *  - [[scalaz.Bifunctor]]
+ *  - [[scalaz.Bitraverse]] extends [[scalaz.Bifunctor]]
  *  - [[scalaz.ArrId]]
  *  - [[scalaz.Compose]]
  *  - [[scalaz.Category]] extends [[scalaz.ArrId]] with [[scalaz.Compose]]
@@ -121,6 +122,7 @@ package object scalaz {
   type Reader[E, A] = ReaderT[Id, E, A]
 
   type Writer[W, A] = WriterT[Id, W, A]
+  type Unwriter[W, A] = UnwriterT[Id, W, A]
 
   object Reader {
     def apply[E, A](f: E => A): Reader[E, A] = Kleisli[Id, E, A](f)
@@ -130,14 +132,25 @@ package object scalaz {
     def apply[W, A](w: W, a: A): WriterT[Id, W, A] = WriterT[Id, W, A]((w, a))
   }
 
+  object Unwriter {
+    def apply[U, A](u: U, a: A): UnwriterT[Id, U, A] = UnwriterT[Id, U, A]((u, a))
+  }
+
   /** A state transition, representing a function `S => (A, S)`. */
   type State[S, A] = StateT[Id, S, A]
 
+  // important to define here, rather than at the top-level, to avoid Scala 2.9.2 bug
   object State extends StateFunctions {
     def apply[S, A](f: S => (A, S)): State[S, A] = new StateT[Id, S, A] {
       def apply(s: S) = f(s)
     }
   }
+
+  type Costate[A, B] = CostateT[Id, A, B]
+  // Costate is also known as Store
+  type Store[A, B] = Costate[A, B]
+  // flipped
+  type |-->[A, B] = Costate[B, A]
 
   type ReaderWriterState[R, W, S, A] = ReaderWriterStateT[Identity, R, W, S, A]
 
@@ -146,6 +159,8 @@ package object scalaz {
   val RWST: ReaderWriterStateT.type = ReaderWriterStateT
 
   type RWS[R, W, S, A] = ReaderWriterState[R, W, S, A]
+
+  type Alternative[F[_]] = ApplicativePlus[F]
 
   /**
    * An [[scalaz.Validation]] with a [[scalaz.NonEmptyList]] as the failure type.
@@ -158,4 +173,52 @@ package object scalaz {
 
   type FirstOption[A] = Option[A] @@ Tags.First
   type LastOption[A] = Option[A] @@ Tags.Last
+
+  //
+  // Lens type aliases
+  //
+
+  type Lens[A, B] = LensT[Id, Id, A, B]
+
+  // important to define here, rather than at the top-level, to avoid Scala 2.9.2 bug
+  object Lens extends LensTFunctions with LensTInstances {
+    def apply[A, B](r: A => Costate[B, A]): Lens[A, B] =
+      lens(r)
+  }
+
+  type @>[A, B] = LensT[Id, Id, A, B]
+
+  type LenswT[F[_], G[_], V, W, A, B] =
+    LensT[({type λ[α] = WriterT[F, V, α]})#λ, ({type λ[α] = WriterT[G, W, α]})#λ, A, B]
+
+  type Lensw[V, W, A, B] = LenswT[Id, Id, V, W, A, B]
+
+  type LenshT[F[_], G[_], A, B] =
+  LenswT[F, G, LensGetHistory[A, B], LensSetHistory[A, B], A, B]
+
+  type Lensh[A, B] = LenshT[Id, Id, A, B]
+
+  type PLens[A, B] = PLensT[Id, Id, A, B]
+
+  // important to define here, rather than at the top-level, to avoid Scala 2.9.2 bug
+  object PLens extends PLensTFunctions with PLensTInstances {
+    def apply[A, B](r: A => Option[Costate[B, A]]): PLens[A, B] =
+      plens(r)
+  }
+
+  type @?>[A, B] = PLensT[Id, Id, A, B]
+
+  type PLenswT[F[_], G[_], V, W, A, B] =
+    PLensT[({type λ[α] = WriterT[F, V, α]})#λ, ({type λ[α] = WriterT[G, W, α]})#λ, A, B]
+
+  type PLensw[V, W, A, B] = PLenswT[Id, Id, V, W, A, B]
+
+  type PLenshT[F[_], G[_], A, B] =
+  PLenswT[F, G, PLensGetHistory[A, B], PLensSetHistory[A, B], A, B]
+
+  type PLensh[A, B] = PLenshT[Id, Id, A, B]
+
+  type PStateT[F[_], A, B] = StateT[F, A, Option[B]]
+
+  type PState[A, B] = StateT[Id, A, Option[B]]
 }

@@ -146,8 +146,8 @@ trait Contents {
   implicit val ContentShow: Show[Content] = new Show[Content] {
     def show(c: Content) =
       ("Content{" + (c match {
-        case Elem(e) => "Elem(" + implicitly[Show[Element]].shows(e) + ")"
-        case Text(d) => "Text(" + implicitly[Show[CData]].shows(d) + ")"
+        case Elem(e) => "Elem(" + Show[Element].shows(e) + ")"
+        case Text(d) => "Text(" + Show[CData].shows(d) + ")"
         case CRef(s) => "CRef(" + s.mkString + ")"
         case Comment(s) => "Comment(" + s.mkString + ")"
       }) + "}").toList
@@ -156,10 +156,10 @@ trait Contents {
   implicit val ContentEqual: Equal[Content] = new Equal[Content] {
     def equal(a1: Content, a2: Content) =
       (a1, a2) match {
-        case (Elem(e), Elem(f)) => implicitly[Equal[Element]].equal(e, f)
-        case (Text(d), Text(e)) => implicitly[Equal[CData]].equal(d, e)
-        case (CRef(s), CRef(t)) => implicitly[Equal[Str]].equal(s, t)
-        case (Comment(s), Comment(t)) => implicitly[Equal[Str]].equal(s, t)
+        case (Elem(e), Elem(f)) => Equal[Element].equal(e, f)
+        case (Text(d), Text(e)) => Equal[CData].equal(d, e)
+        case (CRef(s), CRef(t)) => Equal[Str].equal(s, t)
+        case (Comment(s), Comment(t)) => Equal[Str].equal(s, t)
         case (_, _) => false
       }
   }
@@ -171,16 +171,16 @@ object Content extends Contents {
   import PLens._
   import CostateT._
 
-  val elemContentPL: Content @-? Element =
+  val elemContentPL: Content @?> Element =
     plens(_.elem map (e => costate(elem(_), e)))
 
-  val textContentPL: Content @-? CData =
+  val textContentPL: Content @?> CData =
     plens(_.text map (c => costate(text(_), c)))
 
-  val crefContentPL: Content @-? Str =
+  val crefContentPL: Content @?> Str =
     plens(_.cref map (e => costate(cref(_), e)))
 
-  val commentContentPL: Content @-? Str =
+  val commentContentPL: Content @?> Str =
     plens(_.comment map (e => costate(comment(_), e)))
 
 }

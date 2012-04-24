@@ -3,13 +3,14 @@ package scalaz.example
 import scalaz._
 import Scalaz._
 import typelevel._
-import Typelevel._
 
 object TypelevelUsage extends App {
 
   def typed[T](t: T) = ()
 
   object HLists {
+
+    import typelevel.syntax.HLists._
 
     val hlist1 = 3 :: HNil
     val hlist2 = "foo" :: hlist1
@@ -19,8 +20,8 @@ object TypelevelUsage extends App {
 
     hlist2 match {
       case str :: n :: _ =>
-        val _str: String = str
-        val _n: Int = n
+        typed[String](str)
+        typed[Int](n)
     }
 
   }
@@ -119,6 +120,7 @@ object TypelevelUsage extends App {
 
   object Downed {
 
+    import typelevel.syntax.HLists._
     import ALists._
 
     val downed = aplist.down
@@ -141,7 +143,9 @@ object TypelevelUsage extends App {
 
   object Naturals {
 
-    assert(_3.value === 3)
+    import Nats._
+
+    assert(_3.toInt === 3)
 
     val hlist = "foo" :: 3 :: 'a :: HNil
 
@@ -168,17 +172,44 @@ object TypelevelUsage extends App {
 
     assert(f0 === Some(3))
 
+    // Alternative approach to index-based access
+
+    val wrapSome = new (Id ~> Some) { def apply[T](t: T) = Some(t) }
+
+    val stream = (hlist transform wrapSome) +: (HStream const None)
+
+    val g0 = stream(_0).x
+    val g1 = stream(_1).x
+    val g2 = stream(_2).x // caveat: `stream(_2)` on its own does not compile
+
+    typed[String](g0)
+    typed[Int](g1)
+    typed[Symbol](g2)
+
+    assert(g0 === "foo")
+    assert(g1 === 3)
+    assert(g2 == 'a)
+
   }
 
   object Classes {
 
-    val composed = Applicative[List] <<: Applicative[Option] <<: Applicative.compose
+    import typelevel.syntax.TypeClasses._
+    import typelevel.syntax.HLists._
 
-    assert(List(Some(5)) === composed.point(5))
+    // with syntax
+    val prod1 = Applicative[List] *: Applicative[Option]
+    // without syntax
+    val prod2 = Applicative[List] *: Applicative[Option] *: KTypeClass[Applicative].emptyProduct
 
-    val prod = Applicative[List] *: Applicative[Option] *: Applicative.product
+    // derive `Equal` instance
+    // TODO this should work implicitly
 
-    assert(List("1") :: Option("2") :: HNil == prod.map(List(1) :: Option(2) :: HNil)(_.toString))
+    implicit val eq = Equal[List[String]] *: Equal[Option[String]] *: TypeClass[Equal].emptyProduct
+    typed[Equal[List[String] :: Option[String] :: HNil]](eq)
+
+    assert(List("1") :: Option("2") :: HNil === prod1.map(List(1) :: Option(2) :: HNil)(_.toString))
+    assert(List("1") :: Option("2") :: HNil === prod2.map(List(1) :: Option(2) :: HNil)(_.toString))
 
   }
 
@@ -195,4 +226,3 @@ object TypelevelUsage extends App {
 }
 
 // vim: expandtab:ts=2:sw=2
-

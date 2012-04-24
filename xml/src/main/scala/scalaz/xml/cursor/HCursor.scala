@@ -62,9 +62,9 @@ trait HCursors {
 
   implicit val HCursorShow: Show[HCursor] = new Show[HCursor] {
     def show(c: HCursor) =
-      ("HCursor{history=" + implicitly[Show[History]].shows(c.history) + (c.cursor match {
+      ("HCursor{history=" + Show[History].shows(c.history) + (c.cursor match {
         case None => ""
-        case Some(q) => ",cursor=" + implicitly[Show[Cursor]].shows(q)
+        case Some(q) => ",cursor=" + Show[Cursor].shows(q)
       }) + "}").toList
   }
 
@@ -78,10 +78,10 @@ object HCursor extends HCursors {
   import Lens._
   import CostateT._
 
-  val historyHCursorL: HCursor @-@ History =
+  val historyHCursorL: HCursor @> History =
     lens(x => costate(b => hcursor(b, x.cursor), x.history))
 
-  val cursorHCursorL: HCursor @-@ Option[Cursor] =
+  val cursorHCursorL: HCursor @> Option[Cursor] =
     lens(x => costate(b => hcursor(x.history, b), x.cursor))
 
 }

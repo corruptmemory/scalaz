@@ -30,7 +30,7 @@ trait Attrs {
 
   /// lookupAttr
   def lookup(n: QName, as: List[Attr]): Option[Str] =
-    lookupBy(implicitly[Equal[QName]].equal(n, _), as)
+    lookupBy(Equal[QName].equal(n, _), as)
 
   import std.AllInstances._
 
@@ -42,7 +42,7 @@ trait Attrs {
 
   implicit val AttrShow: Show[Attr] = new Show[Attr] {
     def show(c: Attr) =
-      ("Attr{key=" + implicitly[Show[QName]].shows(c.key) + ",value=" + c.value.mkString + "}").toList
+      ("Attr{key=" + Show[QName].shows(c.key) + ",value=" + c.value.mkString + "}").toList
   }
 
 }
@@ -52,10 +52,10 @@ object Attr extends Attrs {
   import Lens._
   import CostateT._
 
-  val keyAttrL: Attr @-@ QName =
+  val keyAttrL: Attr @> QName =
     lens(x => costate(b => attr(b, x.value), x.key))
 
-  val valueAttrL: Attr @-@ Str =
+  val valueAttrL: Attr @> Str =
     lens(x => costate(b => attr(x.key, b), x.value))
 
 }

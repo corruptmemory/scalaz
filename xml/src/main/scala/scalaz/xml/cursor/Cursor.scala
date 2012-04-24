@@ -448,7 +448,7 @@ trait Cursors {
 
   implicit val CursorShow: Show[Cursor] = new Show[Cursor] {
     def show(c: Cursor) =
-      ("Cursor{current=" + implicitly[Show[Content]].shows(c.current) + ",lefts=" + implicitly[Show[List[Content]]].shows(c.lefts) + ",rights=" + implicitly[Show[List[Content]]].shows(c.rights) + ",parents=" + implicitly[Show[Path]].shows(c.parents)).toList
+      ("Cursor{current=" + Show[Content].shows(c.current) + ",lefts=" + Show[List[Content]].shows(c.lefts) + ",rights=" + Show[List[Content]].shows(c.rights) + ",parents=" + Show[Path].shows(c.parents)).toList
   }
 
   implicit val CursorEqual: Equal[Cursor] =
@@ -461,16 +461,16 @@ object Cursor extends Cursors {
   import Lens._
   import CostateT._
 
-  val currentCursorL: Cursor @-@ Content =
+  val currentCursorL: Cursor @> Content =
     lens(x => costate(b => cursor(b, x.lefts, x.rights, x.parents), x.current))
 
-  val leftsCursorL: Cursor @-@ List[Content] =
+  val leftsCursorL: Cursor @> List[Content] =
     lens(x => costate(b => cursor(x.current, b, x.rights, x.parents), x.lefts))
 
-  val rightsCursorL: Cursor @-@ List[Content] =
+  val rightsCursorL: Cursor @> List[Content] =
     lens(x => costate(b => cursor(x.current, x.lefts, b, x.parents), x.rights))
 
-  val parentsCursorL: Cursor @-@ Path =
+  val parentsCursorL: Cursor @> Path =
     lens(x => costate(b => cursor(x.current, x.lefts, x.rights, b), x.parents))
 
 }

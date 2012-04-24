@@ -8,17 +8,24 @@ sealed trait Kleisli[M[_], A, B] { self =>
 
   import Kleisli._
 
-  // TODO provide non-symbolic aliases.
+  def compose[C](k: Kleisli[M, C, A])(implicit b: Bind[M]): Kleisli[M, C, B] = k >=> this
 
-  def >=>[C](k: Kleisli[M, B, C])(implicit b: Bind[M]): Kleisli[M, A, C] = kleisli((a: A) => b.bind(this(a))(k(_)))
-
-  def >=>[C](k: B => M[C])(implicit b: Bind[M]): Kleisli[M, A, C] = >=>(kleisli(k))
-
+  /** alias for `compose` */
   def <=<[C](k: Kleisli[M, C, A])(implicit b: Bind[M]): Kleisli[M, C, B] = k >=> this
 
-  def <=<[C](k: C => M[A])(implicit b: Bind[M]): Kleisli[M, C, B] = kleisli(k) >=> this
+  def andThen[C](k: Kleisli[M, C, A])(implicit b: Bind[M]): Kleisli[M, C, B] =
+    k >=> this
 
-  def compose[N[_]](f: M[B] => N[B]): Kleisli[N, A, B] = kleisli((a: A) => f(this(a)))
+  /** alias for `andThen` */
+  def >=>[C](k: Kleisli[M, B, C])(implicit b: Bind[M]): Kleisli[M, A, C] = kleisli((a: A) => b.bind(this(a))(k(_)))
+
+  def composeK[C](k: B => M[C])(implicit b: Bind[M]): Kleisli[M, A, C] = >==>(k)
+
+  def >==>[C](k: B => M[C])(implicit b: Bind[M]): Kleisli[M, A, C] = >=>(kleisli(k))
+
+  def andThenK[C](k: C => M[A])(implicit b: Bind[M]): Kleisli[M, C, B] = <==<(k)
+
+  def <==<[C](k: C => M[A])(implicit b: Bind[M]): Kleisli[M, C, B] = kleisli(k) >=> this
 
   def traverse[F[_], AA <: A](f: F[AA])(implicit M: Applicative[M], F: Traverse[F]): M[F[B]] =
     F.traverse(f)(Kleisli.this(_))
@@ -42,12 +49,12 @@ sealed trait Kleisli[M[_], A, B] { self =>
   }
         
   import Liskov._
-  def unlift[M[_], FF[_]](implicit M: Copointed[M], ev: this.type <~< Kleisli[({type λ[α] = M[FF[α]]})#λ, A, B]): Kleisli[FF, A, B] = new Kleisli[FF, A, B] {
-    def run(a: A) = Copointed[M].copoint(ev(self) run a)
+  def unlift[N[_], FF[_]](implicit M: Copointed[N], ev: this.type <~< Kleisli[({type λ[α] = N[FF[α]]})#λ, A, B]): Kleisli[FF, A, B] = new Kleisli[FF, A, B] {
+    def run(a: A) = Copointed[N].copoint(ev(self) run a)
   }
 
-  def unliftId[M[_]](implicit M: Copointed[M], ev: this.type <~< Kleisli[({type λ[α] = M[α]})#λ, A, B]): Reader[A, B] =
-    unlift[M, Id]
+  def unliftId[N[_]](implicit M: Copointed[N], ev: this.type <~< Kleisli[({type λ[α] = N[α]})#λ, A, B]): Reader[A, B] =
+    unlift[N, Id]
 
   def rwst[W, S](implicit M: Functor[M], W: Monoid[W]): ReaderWriterStateT[M, A, W, S, B] = ReaderWriterStateT(
     (r, s) => M.map(self(r)) {
@@ -56,7 +63,7 @@ sealed trait Kleisli[M[_], A, B] { self =>
   )
 
   def liftMK[T[_[_], _]](implicit T: MonadTrans[T], M: Monad[M]): Kleisli[({type l[a] = T[M, a]})#l, A, B] =
-    compose[({type l[a] = T[M, a]})#l](ma => T.liftM(ma))
+    mapK[({type l[a] = T[M, a]})#l, B](ma => T.liftM(ma))
 }
 
 //
@@ -79,6 +86,10 @@ trait KleisliInstances3 extends KleisliInstances4 {
   implicit def kleisliApply[F[_], R](implicit F0: Apply[F]): Apply[({type λ[α] = Kleisli[F, R, α]})#λ] = new KleisliApply[F, R] {
     implicit def F: Apply[F] = F0
   }
+
+  implicit def kleisliDistributive[F[_], R](implicit F0: Distributive[F]): Distributive[({type λ[α] = Kleisli[F, R, α]})#λ] = new KleisliDistributive[F, R] {
+    implicit def F: Distributive[F] = F0
+  }
   implicit def kleisliIdApply[R]: Apply[({type λ[α] = Kleisli[Id, R, α]})#λ] = kleisliApply[Id, R]
 }
 
@@ -99,7 +110,6 @@ trait KleisliInstances1 extends KleisliInstances2 {
   implicit def kleisliArrId[F[_]](implicit F0: Pointed[F]) = new KleisliArrIdArr[F] {
     implicit def F: Pointed[F] = F0
   }
-  implicit def kleisliChoice[F[_]] = new KleisliChoice[F] {}
   implicit def kleisliSemigroup[F[_], A, B](implicit FB0: Semigroup[F[B]]) = new KleisliSemigroup[F, A, B] {
     implicit def FB = FB0
   }
@@ -175,6 +185,13 @@ private[scalaz] trait KleisliApply[F[_], R] extends Apply[({type λ[α] = Kleisl
   override def ap[A, B](fa: => Kleisli[F, R, A])(f: => Kleisli[F, R, (A) => B]): Kleisli[F, R, B] = Kleisli[F, R, B](r => F.ap(fa(r))(f(r)))
 }
 
+private[scalaz] trait KleisliDistributive[F[_], R] extends Distributive[({type λ[α] = Kleisli[F, R, α]})#λ] with KleisliFunctor[F, R] {
+  implicit def F: Distributive[F]
+
+  override def distributeImpl[G[_]: Functor, A, B](a: G[A])(f: A => Kleisli[F, R, B]): Kleisli[F, R, G[B]] =
+    Kleisli(r => F.distribute(a)(f(_) run r))
+}
+
 private[scalaz] trait KleisliApplicative[F[_], R] extends Applicative[({type λ[α] = Kleisli[F, R, α]})#λ] with KleisliApply[F, R] with KleisliPointed[F, R]{
   implicit def F: Applicative[F]
 }
@@ -218,25 +235,12 @@ private[scalaz] trait KleisliArrIdArr[F[_]] extends ArrId[({type λ[α, β] = Kl
   def arr[A, B](f: (A) => B): Kleisli[F, A, B] = kleisli(a => F.point(f(a)))
 }
 
-private[scalaz] trait KleisliChoice[F[_]] extends Choice[({type λ[α, β] = Kleisli[F, α, β]})#λ] {
-  def choice[A, B, C](f: => Kleisli[F, A, C], g: => Kleisli[F, B, C]): Kleisli[F, Either[A, B], C] =
-    Kleisli {
-      case Left(a) => f run a
-      case Right(b) => g run b
-    }
-}
+private[scalaz] trait KleisliArrow[F[_]]
+  extends Arrow[({type λ[α, β] = Kleisli[F, α, β]})#λ]
+  with KleisliArrIdArr[F]
+  with Split[({type λ[α, β] = Kleisli[F, α, β]})#λ]
+  with Choice[({type λ[α, β] = Kleisli[F, α, β]})#λ] {
 
-private[scalaz] trait KleisliSplit[F[_]] extends Split[({type λ[α, β] = Kleisli[F, α, β]})#λ] {
-  implicit def F: Monad[F]
-
-  def split[A, B, C, D](f: Kleisli[F, A, B], g: Kleisli[F, C, D]): Kleisli[F, (A,  C), (B, D)] =
-    Kleisli {
-      case (a, c) =>
-        F.bind(f run a)(b => F.map(g run c)(d => (b, d)))
-    }
-}
-
-private[scalaz] trait KleisliArrow[F[_]] extends Arrow[({type λ[α, β] = Kleisli[F, α, β]})#λ] with KleisliArrIdArr[F] {
   implicit def F: Monad[F]
 
   def compose[A, B, C](bc: Kleisli[F, B, C], ab: Kleisli[F, A, B]): Kleisli[F, A, C] = ab >=> bc
@@ -244,6 +248,18 @@ private[scalaz] trait KleisliArrow[F[_]] extends Arrow[({type λ[α, β] = Kleis
   def first[A, B, C](f: Kleisli[F, A, B]): Kleisli[F, (A, C), (B, C)] = kleisli[F, (A, C), (B, C)] {
     case (a, c) => F.map(f.run(a))((b: B) => (b, c))
   }
+
+  def choice[A, B, C](f: => Kleisli[F, A, C], g: => Kleisli[F, B, C]): Kleisli[F, Either[A, B], C] =
+    Kleisli {
+      case Left(a) => f run a
+      case Right(b) => g run b
+    }
+
+  def split[A, B, C, D](f: Kleisli[F, A, B], g: Kleisli[F, C, D]): Kleisli[F, (A, C), (B, D)] =
+    Kleisli {
+      case (a, c) =>
+        F.bind(f run a)(b => F.map(g run c)(d => (b, d)))
+    }
 }
 
 private[scalaz] trait KleisliSemigroup[F[_], A, B] extends Semigroup[Kleisli[F, A, B]] {

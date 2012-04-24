@@ -3,8 +3,7 @@ package typelevel
 
 import java.{lang => jl, util => ju}
 
-import syntax.semigroup._
-import Typelevel._
+import scalaz.syntax.semigroup._
 import UnionTypes._
 
 trait Formatter[Params <: HList, R] extends (Params => R) { self =>
@@ -71,9 +70,6 @@ class SimpleUnionFormat[D <: Disj, R](f: Any => R) extends UnionFormat[D, R] {
 }
 
 trait Formatters {
-
-  def FNil[R : Monoid] =
-    Formatter[HNil, R](_ => Monoid[R].zero)
 
   implicit def format2Formatter[T, R : Semigroup](f: Format[T, R]) =
     Formatter[HCons[_ <: T, HNil], R](params => f(params.head))

@@ -225,8 +225,8 @@ trait Ops {
   implicit val OpShow: Show[Op] = new Show[Op] {
     def show(x: Op) =
       (x match {
-        case ChoiceSucceed(h) => "choice-succeed" + implicitly[Show[History]].shows(h)
-        case ChoiceSwitch(o, n) => implicitly[Show[History]].shows(o) + " >choice-switch< " + implicitly[Show[History]].shows(n)
+        case ChoiceSucceed(h) => "choice-succeed" + Show[History].shows(h)
+        case ChoiceSwitch(o, n) => Show[History].shows(o) + " >choice-switch< " + Show[History].shows(n)
         case FailedCompose => "failed-compose"
         case LeftOp => "left"
         case RightOp => "right"
@@ -263,8 +263,8 @@ trait Ops {
   implicit val OpEqual: Equal[Op] = new Equal[Op] {
     def equal(x1: Op, x2: Op) =
       (x1, x2) match {
-        case (ChoiceSucceed(c), ChoiceSucceed(d)) => implicitly[Equal[History]].equal(c, d)
-        case (ChoiceSwitch(n1, o1), ChoiceSwitch(n2, o2)) => implicitly[Equal[History]].equal(n1, n2) && implicitly[Equal[History]].equal(o1, o2)
+        case (ChoiceSucceed(c), ChoiceSucceed(d)) => Equal[History].equal(c, d)
+        case (ChoiceSwitch(n1, o1), ChoiceSwitch(n2, o2)) => Equal[History].equal(n1, n2) && Equal[History].equal(o1, o2)
         case (FailedCompose, FailedCompose) => true
         case (LeftOp, LeftOp) => true
         case (RightOp, RightOp) => true
@@ -275,14 +275,14 @@ trait Ops {
         case (RemoveRight, RemoveRight) => true
         case (Parent, Parent) => true
         case (Root, Root) => true
-        case (FindLeft(p), FindLeft(q)) => implicitly[Equal[CPredicate]].equal(p, q)
-        case (FindRight(p), FindRight(q)) => implicitly[Equal[CPredicate]].equal(p, q)
-        case (FindChild(p), FindChild(q)) => implicitly[Equal[CPredicate]].equal(p, q)
+        case (FindLeft(p), FindLeft(q)) => Equal[CPredicate].equal(p, q)
+        case (FindRight(p), FindRight(q)) => Equal[CPredicate].equal(p, q)
+        case (FindChild(p), FindChild(q)) => Equal[CPredicate].equal(p, q)
         case (NextDepthFirst, NextDepthFirst) => true
-        case (FindRec(p), FindRec(q)) => implicitly[Equal[CPredicate]].equal(p, q)
-        case (NthChild(n), NthChild(o)) => implicitly[Equal[Int]].equal(n(), o())
-        case (Succeeding(_, d), Succeeding(_, e)) => implicitly[Equal[OpDescription]].equal(d, e)
-        case (Generic(_, d), Generic(_, e)) => implicitly[Equal[OpDescription]].equal(d, e)
+        case (FindRec(p), FindRec(q)) => Equal[CPredicate].equal(p, q)
+        case (NthChild(n), NthChild(o)) => Equal[Int].equal(n(), o())
+        case (Succeeding(_, d), Succeeding(_, e)) => Equal[OpDescription].equal(d, e)
+        case (Generic(_, d), Generic(_, e)) => Equal[OpDescription].equal(d, e)
         case (_, _) => false
       }
   }
@@ -353,31 +353,31 @@ object Op extends Ops {
   import PLens._
   import CostateT._
 
-  val choiceSucceedOpPL: Op @-? History =
+  val choiceSucceedOpPL: Op @?> History =
     plens(_.choiceSucceed map (e => costate(choiceSucceedOp(_), e)))
 
-  val choiceSwitchOpPL: Op @-? (History, History) =
+  val choiceSwitchOpPL: Op @?> (History, History) =
     plens(_.choiceSwitch map (e => costate(h => choiceSwitchOp(h._1, h._2), e)))
 
-  val findLeftOpPL: Op @-? CPredicate =
+  val findLeftOpPL: Op @?> CPredicate =
     plens(_.findLeft map (e => costate(findLeftOp(_), e)))
 
-  val findRightOpPL: Op @-? CPredicate =
+  val findRightOpPL: Op @?> CPredicate =
     plens(_.findRight map (e => costate(findRightOp(_), e)))
 
-  val findChildOpPL: Op @-? CPredicate =
+  val findChildOpPL: Op @?> CPredicate =
     plens(_.findChild map (e => costate(findChildOp(_), e)))
 
-  val findRecOpPL: Op @-? CPredicate =
+  val findRecOpPL: Op @?> CPredicate =
     plens(_.findRec map (e => costate(findRecOp(_), e)))
 
-  val nthChildOpPL: Op @-? Int =
+  val nthChildOpPL: Op @?> Int =
     plens(_.nthChild map (e => costate(nthChildOp(_), e)))
 
-  val succeedingOpPL: Op @-? (Cursor => Cursor, OpDescription) =
+  val succeedingOpPL: Op @?> (Cursor => Cursor, OpDescription) =
     plens(_.succeeding map (e => costate(x => succeedingOp(x._1, x._2), e)))
 
-  val genericOpPL: Op @-? (Cursor => Option[Cursor], OpDescription) =
+  val genericOpPL: Op @?> (Cursor => Option[Cursor], OpDescription) =
     plens(_.generic map (e => costate(x => genericOp(x._1, x._2), e)))
 
 }

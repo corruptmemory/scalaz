@@ -12,7 +12,7 @@ object build extends Build {
   lazy val standardSettings: Seq[Sett] = Defaults.defaultSettings ++ Seq[Sett](
     organization := "org.scalaz",
     version := "7.0-SNAPSHOT",
-    scalaVersion := "2.9.1",
+    scalaVersion := "2.9.2",
     scalacOptions <++= (scalaVersion).map((sv: String) => Seq("-deprecation", "-unchecked") ++ (if(sv.contains("2.10")) None else Some("-Ydependent-method-types"))),
     scalacOptions in (Compile, doc) <++= (baseDirectory in LocalProject("scalaz")).map {
       bd => Seq("-sourcepath", bd.getAbsolutePath, "-doc-source-url", "https://github.com/scalaz/scalaz/tree/scalaz-seven€{FILE_PATH}.scala")
@@ -167,10 +167,10 @@ object build extends Build {
   lazy val scalacheckBinding = Project(
     id           = "scalacheck-binding",
     base         = file("scalacheck-binding"),
-    dependencies = Seq(core, concurrent),
+    dependencies = Seq(core, concurrent, typelevel),
     settings     = standardSettings ++ Seq[Sett](
       name := "scalaz-scalacheck-binding",
-      libraryDependencies += "org.scala-tools.testing" %% "scalacheck" % "1.9"
+      libraryDependencies += "org.scala-tools.testing" % "scalacheck_2.9.1" % "1.9"
     )
   )
 
@@ -181,8 +181,8 @@ object build extends Build {
     settings = standardSettings ++Seq[Sett](
       name := "scalaz-tests",
       libraryDependencies ++= Seq(
-        "org.specs2" %% "specs2" % "1.6.1" % "test",
-        "org.scala-tools.testing" %% "scalacheck" % "1.9" % "test"
+        "org.specs2" % "specs2_2.9.1" % "1.6.1" % "test",
+        "org.scala-tools.testing" % "scalacheck_2.9.1" % "1.9" % "test"
       )
     )
   )
@@ -257,7 +257,7 @@ object build extends Build {
       }
 
       val pimp = """|
-          |trait Tuple%dV[%s] extends SyntaxV[Tuple%d[%s]] {
+          |trait Tuple%dOps[%s] extends Ops[Tuple%d[%s]] {
           |  val value = self
           |  def fold[Z](f: => (%s) => Z): Z = {import value._; f(%s)}
           |  def toIndexedSeq[Z](implicit ev: value.type <:< Tuple%d[%s]): IndexedSeq[Z] = {val zs = ev(value); import zs._; IndexedSeq(%s)}
@@ -267,17 +267,17 @@ object build extends Build {
         mapallTParams, mapallParams, mapallTParams, mapallApply
       )
 
-      val conv = """implicit def ToTuple%dV[%s](t: (%s)): Tuple%dV[%s] = new { val self = t } with Tuple%dV[%s]
+      val conv = """implicit def ToTuple%dOps[%s](t: (%s)): Tuple%dOps[%s] = new { val self = t } with Tuple%dOps[%s]
           |""".stripMargin.format(arity, tparams, tparams, arity, tparams, arity, tparams)
       (pimp, conv)
     }
 
     val source = "package scalaz\npackage syntax\npackage std\n\n" +
       tuples.map(_._1).mkString("\n") +
-      "\n\ntrait ToTupleV {\n" +
+      "\n\ntrait ToTupleOps {\n" +
          tuples.map("  " + _._2).mkString("\n") +
       "}"
-    writeFileScalazPackage("TupleV.scala", source)
+    writeFileScalazPackage("TupleOps.scala", source)
   }
 
 }

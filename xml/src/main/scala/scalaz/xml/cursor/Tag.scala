@@ -43,7 +43,7 @@ trait Tags {
 
   implicit val TagShow: Show[Tag] = new Show[Tag] {
     def show(t: Tag) =
-      ("Tag{name=" + implicitly[Show[QName]].shows(t.name) + ",attribs=" + implicitly[Show[List[Attr]]].shows(t.attribs) + (t.line match {
+      ("Tag{name=" + Show[QName].shows(t.name) + ",attribs=" + Show[List[Attr]].shows(t.attribs) + (t.line match {
         case None => ""
         case Some(l) => ",line=" + l
       }) + "}").toList
@@ -59,13 +59,13 @@ object Tag extends Tags {
   import Lens._
   import CostateT._
 
-  val nameTagL: Tag @-@ QName =
+  val nameTagL: Tag @> QName =
     lens(x => costate(b => tag(b, x.attribs, x.line), x.name))
 
-  val attribsTagL: Tag @-@ List[Attr] =
+  val attribsTagL: Tag @> List[Attr] =
     lens(x => costate(b => tag(x.name, b, x.line), x.attribs))
 
-  val lineTagL: Tag @-@ Option[Line] =
+  val lineTagL: Tag @> Option[Line] =
     lens(x => costate(b => tag(x.name, x.attribs, b), x.line))
 
 }
